@@ -71,31 +71,105 @@ notification:
 
 # 用于让关注度更高的新闻在更前面显示，即用算法重新组合不同平台的热搜排序形成你侧重的热搜，合起来是 1 就行
 weight:
-  rank_weight: 0.6 # 排名权重
-  frequency_weight: 0.3 # 频次权重
-  hotness_weight: 0.1 # 热度权重
+  rank_weight: 0.4 # 排名权重
+  frequency_weight: 0.35 # 频次权重
+  hotness_weight: 0.25 # 热度权重
 
 # name 可以定义任意名称，只具有显示作用，即使项目运行了几天后，忽然改掉 name 也不会影响代码的正常运行
 platforms:
-  - id: "toutiao"
-    name: "今日头条"
-  - id: "baidu"
-    name: "百度热搜"
   - id: "wallstreetcn-hot"
     name: "华尔街见闻"
-  - id: "thepaper"
-    name: "澎湃新闻"
-  - id: "bilibili-hot-search"
-    name: "bilibili 热搜"
   - id: "cls-hot"
     name: "财联社热门"
-  - id: "ifeng"
-    name: "凤凰网"
-  - id: "tieba"
-    name: "贴吧"
-  - id: "weibo"
-    name: "微博"
-  - id: "douyin"
-    name: "抖音"
+  - id: "bilibili-hot-search"
+    name: "bilibili 热搜"
   - id: "zhihu"
     name: "知乎"
+  - id: "bbc-news"
+    name: "BBC News"
+  - id: "baidu"
+    name: "百度热搜"
+  - id: "weibo"
+    name: "微博"
+  - id: "tieba"
+    name: "贴吧"
+  - id: "nhk"
+    name: "NHK"
+  - id: "science-news"
+    name: "Science Magazine"
+  - id: "nature-news"
+    name: "Nature Journal"
+  - id: "github-blog"
+    name: "GitHub Blog"
+  - id: "nationalgeographic"
+    name: "National Geographic"
+  - id: "forbes"
+    name: "Forbes"
+  - id: "time"
+    name: "TIME"
+  - id: "life"
+    name: "LIFE"
+
+custom_sources:
+  - id: "bbc-news"
+    type: "rss"
+    url: "http://feeds.bbci.co.uk/news/rss.xml"
+  - id: "nytimes-top"
+    type: "rss"
+    url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+  - id: "nhk"
+    type: "rss"
+    url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
+  - id: "science-news"
+    type: "rss"
+    url: "https://www.science.org/rss/news.xml"
+  - id: "nature-news"
+    type: "rss"
+    url: "https://www.nature.com/nature.rss"
+  - id: "github-blog"
+    type: "rss"
+    url: "https://github.blog/feed/"
+  - id: "nationalgeographic"
+    type: "rss"
+    url: "https://www.nationalgeographic.com/content/nationalgeographic/en_US/rss/index.rss"
+  - id: "forbes"
+    type: "rss"
+    url: "https://www.forbes.com/business/feed/"
+  - id: "time"
+    type: "rss"
+    url: "https://time.com/feed/"
+  - id: "life"
+    type: "rss"
+    url: "https://www.life.com/feed/"
+
+selection:
+  domestic_ids:
+    - wallstreetcn-hot
+    - cls-hot
+    - bilibili-hot-search
+    - zhihu
+    - baidu
+    - weibo
+    - tieba
+  international_ids:
+    - bbc-news
+    - nytimes-top
+    - nhk
+    - science-news
+    - nature-news
+    - github-blog
+    - nationalgeographic
+    - forbes
+    - time
+    - life
+  category_keywords:
+    tech: [ai, 人工智能, 机器人, 芯片, 半导体, NVIDIA, 英伟达, OpenAI, 微软, 谷歌, GitHub, 科技, 自动驾驶, 量子, 火箭, 航天, 科研, 科学, 计算机]
+    humanities: [人文, 文化, 历史, 教育, 艺术, 伦理, 社会]
+    finance: [财经, 金融, 股市, 经济, 通胀, 利率, 投资, 资本, 货币, 华尔街, 彭博]
+  quotas:
+    domestic: 15
+    international: 10
+    tech: 5
+    humanities: 5
+    finance: 5
+    others: 10

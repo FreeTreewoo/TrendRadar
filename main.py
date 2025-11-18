@@ -209,6 +209,18 @@ def load_config():
     else:
         print("未配置任何通知渠道")
 
+    # 自定义源
+    custom_list = config_data.get("custom_sources", [])
+    custom_map = {}
+    for src in custom_list:
+        sid = src.get("id")
+        if sid:
+            custom_map[sid] = {
+                "type": src.get("type", "rss"),
+                "url": src.get("url", ""),
+            }
+    config["CUSTOM_SOURCES"] = custom_map
+
     return config
 
 
@@ -434,8 +446,9 @@ class PushRecordManager:
 class DataFetcher:
     """数据获取器"""
 
-    def __init__(self, proxy_url: Optional[str] = None):
+    def __init__(self, proxy_url: Optional[str] = None, custom_sources: Optional[Dict] = None):
         self.proxy_url = proxy_url
+        self.custom_sources = custom_sources or {}
 
     def fetch_data(
         self,
@@ -451,7 +464,13 @@ class DataFetcher:
             id_value = id_info
             alias = id_value
 
-        url = f"https://newsnow.busiyi.world/api/s?id={id_value}&latest"
+        source_meta = self.custom_sources.get(id_value)
+        if source_meta:
+            src_type = source_meta.get("type", "rss").lower()
+            src_url = source_meta.get("url", "")
+        else:
+            src_type = "aggregator"
+            src_url = f"https://newsnow.busiyi.world/api/s?id={id_value}&latest"
 
         proxies = None
         if self.proxy_url:
@@ -469,20 +488,55 @@ class DataFetcher:
         while retries <= max_retries:
             try:
                 response = requests.get(
-                    url, proxies=proxies, headers=headers, timeout=10
+                    src_url, proxies=proxies, headers=headers, timeout=10
                 )
                 response.raise_for_status()
-
-                data_text = response.text
-                data_json = json.loads(data_text)
-
-                status = data_json.get("status", "未知")
-                if status not in ["success", "cache"]:
-                    raise ValueError(f"响应状态异常: {status}")
-
-                status_info = "最新数据" if status == "success" else "缓存数据"
-                print(f"获取 {id_value} 成功（{status_info}）")
-                return data_text, id_value, alias
+                if src_type == "rss":
+                    import xml.etree.ElementTree as ET
+                    root = ET.fromstring(response.content)
+                    items = []
+                    rank_index = 1
+                    for item in root.findall(".//item"):
+                        title_el = item.find("title")
+                        link_el = item.find("link")
+                        title = title_el.text.strip() if title_el is not None and title_el.text else ""
+                        url_val = link_el.text.strip() if link_el is not None and link_el.text else ""
+                        if title:
+                            items.append({
+                                "title": title,
+                                "url": url_val,
+                                "mobileUrl": ""
+                            })
+                            rank_index += 1
+                    data_json = {"status": "success", "items": items}
+                    data_text = json.dumps(data_json, ensure_ascii=False)
+                    print(f"获取 {id_value} 成功（RSS）")
+                    return data_text, id_value, alias
+                elif src_type == "json":
+                    data_json = response.json()
+                    normalized_items = []
+                    for idx, item in enumerate(data_json.get("items", []), 1):
+                        title = item.get("title") or item.get("headline") or ""
+                        url_val = item.get("url") or item.get("link") or ""
+                        mobile_val = item.get("mobileUrl") or ""
+                        if title:
+                            normalized_items.append({
+                                "title": title,
+                                "url": url_val,
+                                "mobileUrl": mobile_val
+                            })
+                    data_text = json.dumps({"status": "success", "items": normalized_items}, ensure_ascii=False)
+                    print(f"获取 {id_value} 成功（JSON）")
+                    return data_text, id_value, alias
+                else:
+                    data_text = response.text
+                    data_json = json.loads(data_text)
+                    status = data_json.get("status", "未知")
+                    if status not in ["success", "cache"]:
+                        raise ValueError(f"响应状态异常: {status}")
+                    status_info = "最新数据" if status == "success" else "缓存数据"
+                    print(f"获取 {id_value} 成功（{status_info}）")
+                    return data_text, id_value, alias
 
             except Exception as e:
                 retries += 1
@@ -1238,6 +1292,7 @@ def count_word_frequency(
                 word_stats[group_key]["titles"][source_id].append(
                     {
                         "title": title,
+                        "source_id": source_id,
                         "source_name": source_name,
                         "first_time": first_time,
                         "last_time": last_time,
@@ -1619,6 +1674,82 @@ def generate_html_report(
     file_path = get_output_path("html", filename)
 
     report_data = prepare_report_data(stats, failed_ids, new_titles, id_to_name, mode)
+
+    def _match_keywords(text: str, keywords: List[str]) -> bool:
+        t = text.lower()
+        for kw in keywords:
+            if kw.lower() in t:
+                return True
+        return False
+
+    sel_cfg = CONFIG.get("SELECTION", {})
+    if sel_cfg:
+        domestic_ids = set(sel_cfg.get("DOMESTIC_IDS", []))
+        international_ids = set(sel_cfg.get("INTERNATIONAL_IDS", []))
+        quotas = sel_cfg.get("QUOTAS", {})
+        cat_kw = sel_cfg.get("CATEGORY_KEYWORDS", {})
+
+        pool = []
+        for stat in report_data["stats"]:
+            for td in stat["titles"]:
+                pool.append(td)
+
+        def _weight(td: Dict) -> float:
+            return calculate_news_weight(td, td.get("rank_threshold", CONFIG["RANK_THRESHOLD"]))
+
+        pool.sort(key=lambda x: (-_weight(x), min(x["ranks"]) if x["ranks"] else 999, -x["count"]))
+
+        picked = set()
+        def _pick(filter_fn, limit: int) -> List[Dict]:
+            res = []
+            for td in pool:
+                key = (td.get("source_id", td.get("source_name")), td["title"]) 
+                if key in picked:
+                    continue
+                if filter_fn(td):
+                    res.append(td)
+                    picked.add(key)
+                    if len(res) >= max(0, int(limit)):
+                        break
+            return res
+
+        sections = []
+        if quotas.get("domestic", 0) > 0:
+            sections.append(("国内热点", _pick(lambda td: td.get("source_id") in domestic_ids, quotas.get("domestic", 0))))
+        if quotas.get("international", 0) > 0:
+            sections.append(("国际热点", _pick(lambda td: td.get("source_id") in international_ids, quotas.get("international", 0))))
+        if quotas.get("tech", 0) > 0:
+            tech_list = _pick(lambda td: _match_keywords(td["title"], cat_kw.get("tech", [])), quotas.get("tech", 0))
+            if tech_list:
+                sections.append(("科技最热", tech_list))
+        if quotas.get("humanities", 0) > 0:
+            hum_list = _pick(lambda td: _match_keywords(td["title"], cat_kw.get("humanities", [])), quotas.get("humanities", 0))
+            if hum_list:
+                sections.append(("人文相关", hum_list))
+        if quotas.get("finance", 0) > 0:
+            fin_list = _pick(lambda td: _match_keywords(td["title"], cat_kw.get("finance", [])), quotas.get("finance", 0))
+            if fin_list:
+                sections.append(("财经相关", fin_list))
+        if quotas.get("others", 0) > 0:
+            others_list = _pick(lambda td: True, quotas.get("others", 0))
+            if others_list:
+                sections.append(("其他探索", others_list))
+
+        if sections:
+            custom_stats = []
+            for name, items in sections:
+                custom_stats.append({
+                    "word": name,
+                    "count": len(items),
+                    "percentage": 0,
+                    "titles": items,
+                })
+            report_data = {
+                "stats": custom_stats,
+                "new_titles": [],
+                "failed_ids": report_data.get("failed_ids", []),
+                "total_new_count": 0,
+            }
 
     html_content = render_html_content(
         report_data, total_titles, is_daily_summary, mode, update_info
@@ -4051,7 +4182,7 @@ class NewsAnalyzer:
         self.update_info = None
         self.proxy_url = None
         self._setup_proxy()
-        self.data_fetcher = DataFetcher(self.proxy_url)
+        self.data_fetcher = DataFetcher(self.proxy_url, CONFIG.get("CUSTOM_SOURCES"))
 
         if self.is_github_actions:
             self._check_version_update()
