@@ -158,9 +158,9 @@ selection:
     humanities: [人文, 文化, 历史, 教育, 艺术, 伦理, 社会]
     finance: [财经, 金融, 股市, 经济, 通胀, 利率, 投资, 资本, 货币, 华尔街, 彭博]
   quotas:
-    domestic: 7
-    international: 5
+    domestic: 15
+    international: 15
     tech: 10
-    humanities: 8
+    humanities: 10
     finance: 5
     others: 10
