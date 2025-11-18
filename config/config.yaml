@@ -87,12 +87,6 @@ platforms:
     name: "知乎"
   - id: "bbc-news"
     name: "BBC News"
-  - id: "baidu"
-    name: "百度热搜"
-  - id: "weibo"
-    name: "微博"
-  - id: "tieba"
-    name: "贴吧"
   - id: "nhk"
     name: "NHK"
   - id: "science-news"
@@ -148,9 +142,6 @@ selection:
     - cls-hot
     - bilibili-hot-search
     - zhihu
-    - baidu
-    - weibo
-    - tieba
   international_ids:
     - bbc-news
     - nytimes-top
@@ -167,9 +158,9 @@ selection:
     humanities: [人文, 文化, 历史, 教育, 艺术, 伦理, 社会]
     finance: [财经, 金融, 股市, 经济, 通胀, 利率, 投资, 资本, 货币, 华尔街, 彭博]
   quotas:
-    domestic: 15
-    international: 10
-    tech: 5
-    humanities: 5
+    domestic: 7
+    international: 5
+    tech: 10
+    humanities: 8
     finance: 5
     others: 10
